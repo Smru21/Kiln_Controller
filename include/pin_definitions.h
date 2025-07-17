@@ -61,7 +61,7 @@
 #define TONE_PIN 10
 
 #elif defined(ESP32)
-#define IRMP_INPUT_PIN 15  // D15
+#define IRMP_INPUT_PIN 27  // D27
 #define IRSND_OUTPUT_PIN 4 // D4
 #include <Arduino.h>
 #define TONE_LEDC_CHANNEL 1 // Using channel 1 makes tone() independent of receiving timer -> No need to stop receiving timer.

@@ -1,6 +1,7 @@
 #ifndef SERIAL_DEBUGGING_H
 #define SERIAL_DEBUGGING_H
 
+#define DEBUG_MODE
 #include <Arduino.h>
 
 /**

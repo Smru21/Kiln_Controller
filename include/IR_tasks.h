@@ -49,7 +49,9 @@
 
 #include <Arduino.h>
 #include "Serial_debugging.h" // Include serial debugging functions
-
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
 /*
  * Set input pin and output pin definitions etc.
  */
@@ -68,7 +70,8 @@
 #define IRMP_FEEDBACK_LED_PIN ALTERNATIVE_IR_FEEDBACK_LED_PIN
 #endif
 
-void IRMP_setup();
-void IR_loop();
+void IR_setup(); // doesn't need to be a task. Just initializes the IRMP lib.
+
+void IR_loop(void *pvParameters); // polls the ir receiver
 
 #endif // IR_TASKS_H
