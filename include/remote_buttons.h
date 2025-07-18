@@ -1,3 +1,5 @@
+// include/remote_buttons.h
+
 #ifndef REMOTE_BUTTONS_H
 #define REMOTE_BUTTONS_H
 
@@ -30,4 +32,4 @@
 #define BUTTON_UNKNOWN 'X'
 
 char commandToButton(uint16_t command);
-#endif
+#endif // REMOTE_BUTTONS_H

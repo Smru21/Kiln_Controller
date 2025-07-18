@@ -1,8 +1,15 @@
+// include/Serial_debugging.h
+
 #ifndef SERIAL_DEBUGGING_H
 #define SERIAL_DEBUGGING_H
 
 #define DEBUG_MODE
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+
+#ifdef DEBUG_MODE
+extern SemaphoreHandle_t serialMutex; // Mutex for serial debugging communication
 
 /**
  * @brief Initializes serial debugging.
@@ -12,11 +19,22 @@
  */
 void serial_debugging_init();
 
-/**
- * @brief Prints a debug message to the serial console.
- * 
- * @param message The message to print.
- */
-void serial_debugging_print(const char* message);
+// Template functions - must be defined in header
+template <typename T>
+void serial_debugging_print(T message)
+{
+    xSemaphoreTake(serialMutex, portMAX_DELAY);
+    Serial.print(message);
+    xSemaphoreGive(serialMutex);
+}
+
+template <typename T>
+void serial_debugging_println(T message)
+{
+    xSemaphoreTake(serialMutex, portMAX_DELAY);
+    Serial.println(message);
+    xSemaphoreGive(serialMutex);
+}
+#endif // DEBUG_MODE
 
 #endif // SERIAL_DEBUGGING_H

@@ -1,3 +1,5 @@
+// src/main.cpp
+
 #include "main.h"
 #include "Serial_debugging.h"
 
@@ -8,6 +10,9 @@ void setup()
 
   // Set up IRMP library
   IR_setup();
+
+  // Set up Kiln tasks
+  Kiln_setup();
 
   // Print a message indicating setup is complete
   serial_debugging_print("IRMP setup complete. Ready to receive IR signals.");

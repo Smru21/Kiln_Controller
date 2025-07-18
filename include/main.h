@@ -6,5 +6,6 @@
 #include "IR_tasks.h" // Include IR tasks for handling IR signals
 #include "Serial_debugging.h" // Include serial debugging functions
 #include "IR_tasks.h" // Include IR tasks header for IR signal processing
+#include "Kiln_tasks.h" // Include Kiln tasks header for internal rtos operations
 
 #endif // MAIN_H
