@@ -35,6 +35,24 @@ void serial_debugging_println(T message)
     Serial.println(message);
     xSemaphoreGive(serialMutex);
 }
+
+// Two parameter templates for format specifiers (HEX, DEC, BIN, OCT)
+template <typename T>
+void serial_debugging_print(T value, int format)
+{
+    xSemaphoreTake(serialMutex, portMAX_DELAY);
+    Serial.print(value, format);
+    xSemaphoreGive(serialMutex);
+}
+
+template <typename T>
+void serial_debugging_println(T value, int format)
+{
+    xSemaphoreTake(serialMutex, portMAX_DELAY);
+    Serial.println(value, format);
+    xSemaphoreGive(serialMutex);
+}
+
 #endif // DEBUG_MODE
 
 #endif // SERIAL_DEBUGGING_H

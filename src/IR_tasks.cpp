@@ -18,9 +18,9 @@ void IR_setup()
     pinMode(IRMP_INPUT_PIN, INPUT);
 
     // Initialize serial debugging
-    Serial.print(F("Ready to receive IR signals of protocols: "));
+    serial_debugging_print(F("Ready to receive IR signals of protocols: "));
     irmp_print_active_protocols(&Serial);
-    Serial.println(F("at pin " STR(IRMP_INPUT_PIN)));
+    serial_debugging_println(F("at pin " STR(IRMP_INPUT_PIN)));
 
     // Create a queue to handle IRMP commands
     // This queue will hold IR commands as uint16_t values
@@ -47,7 +47,7 @@ void IR_loop(void *pvParameters)
     while (irmp_queue == NULL)
     {
         // Wait for the queue to be created
-        Serial.println("Waiting for IRMP queue to be created...");
+        serial_debugging_println("Waiting for IRMP queue to be created...");
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
@@ -72,15 +72,15 @@ void IR_loop(void *pvParameters)
             // Print IR command details for DEBUG_MODE
             #if defined(DEBUG_MODE)
             xSemaphoreTake(serialMutex, portMAX_DELAY); // Take the semaphore to ensure exclusive access to serial
-            Serial.print("IR Command Received: ");
-            Serial.print("Protocol: ");
-            Serial.print(irmp_data.protocol);
-            Serial.print(" Address: 0x");
-            Serial.print(irmp_data.address, HEX);
-            Serial.print(" Command: 0x");
-            Serial.print(irmp_data.command, HEX);
-            Serial.print(" Flags: 0x");
-            Serial.println(irmp_data.flags, HEX);
+            serial_debugging_print("IR Command Received: ");
+            serial_debugging_print("Protocol: ");
+            serial_debugging_print(irmp_data.protocol);
+            serial_debugging_print(" Address: 0x");
+            serial_debugging_print(irmp_data.address, HEX);
+            serial_debugging_print(" Command: 0x");
+            serial_debugging_print(irmp_data.command, HEX);
+            serial_debugging_print(" Flags: 0x");
+            serial_debugging_println(irmp_data.flags, HEX);
             xSemaphoreGive(serialMutex); // Release the semaphore after printing
             #endif
 
