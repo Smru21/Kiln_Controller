@@ -7,6 +7,8 @@
 // Only define irmp_data here, NOT in the header!
 IRMP_DATA irmp_data;
 
+QueueHandle_t irmp_queue = NULL; // Initialize the queue to NULL
+
 TaskHandle_t IRMP_loop_handle; // Task handle for the IRMP loop task
 
 void IR_setup()
@@ -71,19 +73,18 @@ void IR_loop(void *pvParameters)
 
             // Print IR command details for DEBUG_MODE
             #if defined(DEBUG_MODE)
-            xSemaphoreTake(serialMutex, portMAX_DELAY); // Take the semaphore to ensure exclusive access to serial
-            serial_debugging_print("IR Command Received: ");
-            serial_debugging_print("Protocol: ");
-            serial_debugging_print(irmp_data.protocol);
-            serial_debugging_print(" Address: 0x");
-            serial_debugging_print(irmp_data.address, HEX);
-            serial_debugging_print(" Command: 0x");
-            serial_debugging_print(irmp_data.command, HEX);
-            serial_debugging_print(" Flags: 0x");
-            serial_debugging_println(irmp_data.flags, HEX);
-            xSemaphoreGive(serialMutex); // Release the semaphore after printing
-            #endif
-
+            // xSemaphoreTake(serialMutex, portMAX_DELAY); // Take the semaphore to ensure exclusive access to serial
+            // serial_debugging_print("IR Command Received: ");
+            // serial_debugging_print("Protocol: ");
+            // serial_debugging_print(irmp_data.protocol);
+            // serial_debugging_print(" Address: 0x");
+            // serial_debugging_print(irmp_data.address, HEX);
+            // serial_debugging_print(" Command: 0x");
+            // serial_debugging_print(irmp_data.command, HEX);
+            // serial_debugging_print(" Flags: 0x");
+            // serial_debugging_println(irmp_data.flags, HEX);
+            // xSemaphoreGive(serialMutex); // Release the semaphore after printing
+            #endif           
         }
 
         // Use proper task delay instead of tight loop

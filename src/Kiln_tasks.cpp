@@ -2,19 +2,21 @@
 #include "Kiln_tasks.h"
 
 QueueHandle_t button_queue = NULL; // Initialize the button queue to NULL
-QueueHandle_t irmp_queue = NULL; // Initialize the queue to NULL
+
+// Task handles of all internal managing tasks
+TaskHandle_t Kiln_IR_decode_handle; // Task handle for the IR decoding task
 
 void Kiln_setup()
 {
     button_queue = xQueueCreate(10, sizeof(uint16_t)); // Create a queue for button commands
     xTaskCreatePinnedToCore(
-        Kiln_IR_decode,      // Task function
-        "Kiln_IR_decode",    // Name of the task
-        2048,                // Stack size in bytes
-        NULL,                // Task parameters
-        1,                   // Priority of the task
-        NULL,                // Task handle (not used here)
-        ARDUINO_RUNNING_CORE // Core to run the task on
+        Kiln_IR_decode,                 // Task function
+        "Kiln_IR_decode",               // Name of the task
+        2048,                           // Stack size in bytes
+        NULL,                           // Task parameters
+        1,                              // Priority of the task
+        &Kiln_IR_decode_handle,         // Task handle (not used here)
+        ARDUINO_RUNNING_CORE            // Core to run the task on
     );
 }
 

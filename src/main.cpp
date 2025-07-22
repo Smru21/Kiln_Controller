@@ -14,6 +14,9 @@ void setup()
   // Set up Kiln tasks
   Kiln_setup();
 
+  // Set up LCD tasks
+  LCD_setup();
+
   // Print a message indicating setup is complete
   serial_debugging_print("IRMP setup complete. Ready to receive IR signals.");
 

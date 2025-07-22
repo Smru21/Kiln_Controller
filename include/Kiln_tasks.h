@@ -19,11 +19,27 @@
 #include "remote_buttons.h" // Include remote button definitions
 #include "Serial_debugging.h" // Include serial debugging functions
 
+// Global flags
+extern uint8_t next_task; // Flag to indicate the next task to run
+extern uint8_t prev_task; // Flag to indicate previously run task
+// Queue handles
 extern QueueHandle_t irmp_queue; // Queue to handle IRMP commands
 extern QueueHandle_t button_queue; // Queue to handle button commands
+// Semaphores
+extern SemaphoreHandle_t display_mutex; // Mutex for display operations
+// Task handles of all tasks
+extern TaskHandle_t IRMP_loop_handle; // Task handle for the IRMP loop task
+extern TaskHandle_t Kiln_IR_decode_handle; // Task handle for the IR decoding task
+extern TaskHandle_t Kiln_LCD_manager_handle; // Task handle for the LCD manager task
+extern TaskHandle_t LCD_startscreen_handle; // Task handle for the LCD start screen task 
 
 void Kiln_setup();
 
+// FreeRTOS kiln central tasks
+// This task decodes IR signals and sends button presses to the button queue
 void Kiln_IR_decode(void* pvParameters);
+
+// This task manages multiple windows of the the tft display depending on the button pressed
+void Kiln_LCD_manager(void* pvParameters);
 
 #endif // KILN_TASKS_H
