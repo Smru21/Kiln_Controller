@@ -26,7 +26,7 @@ void IR_setup()
 
     // Create a queue to handle IRMP commands
     // This queue will hold IR commands as uint16_t values
-    irmp_queue = xQueueCreate(10, sizeof(uint16_t));
+    irmp_queue = xQueueCreate(5, sizeof(uint16_t));
 
     // Create the IRMP loop task
     xTaskCreatePinnedToCore(

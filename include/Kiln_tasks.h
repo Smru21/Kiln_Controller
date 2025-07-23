@@ -27,10 +27,13 @@ extern QueueHandle_t irmp_queue; // Queue to handle IRMP commands
 extern QueueHandle_t button_queue; // Queue to handle button commands
 // Semaphores
 extern SemaphoreHandle_t display_mutex; // Mutex for display operations
+extern SemaphoreHandle_t ir_mutex; // Mutex to prevent ir commands piling up while switching windows
 // Task handles of all tasks
 extern TaskHandle_t IRMP_loop_handle; // Task handle for the IRMP loop task
+
 extern TaskHandle_t Kiln_IR_decode_handle; // Task handle for the IR decoding task
-extern TaskHandle_t Kiln_LCD_manager_handle; // Task handle for the LCD manager task
+
+extern TaskHandle_t LCD_entersteps_handle; // Task handle for the LCD enter steps task
 extern TaskHandle_t LCD_startscreen_handle; // Task handle for the LCD start screen task 
 
 void Kiln_setup();

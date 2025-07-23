@@ -3,12 +3,16 @@
 
 QueueHandle_t button_queue = NULL; // Initialize the button queue to NULL
 
+SemaphoreHandle_t ir_mutex = NULL;
+
 // Task handles of all internal managing tasks
 TaskHandle_t Kiln_IR_decode_handle; // Task handle for the IR decoding task
 
 void Kiln_setup()
 {
-    button_queue = xQueueCreate(10, sizeof(uint16_t)); // Create a queue for button commands
+    button_queue = xQueueCreate(5, sizeof(char)); // Create a queue for button commands
+    ir_mutex = xSemaphoreCreateMutex();
+
     xTaskCreatePinnedToCore(
         Kiln_IR_decode,                 // Task function
         "Kiln_IR_decode",               // Name of the task
