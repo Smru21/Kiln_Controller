@@ -19,9 +19,6 @@
 #include "remote_buttons.h" // Include remote button definitions
 #include "Serial_debugging.h" // Include serial debugging functions
 
-// Global flags
-extern uint8_t next_task; // Flag to indicate the next task to run
-extern uint8_t prev_task; // Flag to indicate previously run task
 // Queue handles
 extern QueueHandle_t irmp_queue; // Queue to handle IRMP commands
 extern QueueHandle_t button_queue; // Queue to handle button commands
@@ -33,8 +30,7 @@ extern TaskHandle_t IRMP_loop_handle; // Task handle for the IRMP loop task
 
 extern TaskHandle_t Kiln_IR_decode_handle; // Task handle for the IR decoding task
 
-extern TaskHandle_t LCD_entersteps_handle; // Task handle for the LCD enter steps task
-extern TaskHandle_t LCD_startscreen_handle; // Task handle for the LCD start screen task 
+extern TaskHandle_t LCD_task_handle; // Task handle for all lcd windows. Use a state machine to switch between windows.
 
 void Kiln_setup();
 

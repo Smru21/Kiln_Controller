@@ -28,8 +28,11 @@ void LCD_setup();
 
 int charToNumber(char ch);
 
-void LCD_startscreen(void *pvParameters);
-void LCD_entersteps(void *pvParameters);
-//void LCD_creategraph(void *pvParameters);
+void drawStartScreen();
+void handleStartScreenInput();
+void drawEnterStepsScreen();
+void handleEnterStepsInput();
+
+void LCD_task(void *pvParameters);
 
 #endif // LCD_TASKS_H
