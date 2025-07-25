@@ -27,11 +27,15 @@ void emptyQueue(QueueHandle_t queue)
 void LCD_setup();
 
 int charToNumber(char ch);
+uint16_t *getCurrentTempValue();
 
 void drawStartScreen();
 void handleStartScreenInput();
 void drawEnterStepsScreen();
 void handleEnterStepsInput();
+void drawEnterPointsForGraph();
+void handleEnterPointsForGraphInput();
+void highlightCurrentField();
 
 void LCD_task(void *pvParameters);
 
