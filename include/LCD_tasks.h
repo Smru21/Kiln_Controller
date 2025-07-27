@@ -4,6 +4,7 @@
 
 #include "Kiln_tasks.h"
 #include <TFT_eSPI.h> // Include the TFT library for LCD tasks
+#include <TFT_eWidget.h> // For graphing
 
 #define TASK0 LCD_startscreen_handle
 #define TASK1 LCD_startscreen_handle
@@ -36,6 +37,10 @@ void handleEnterStepsInput();
 void drawEnterPointsForGraph();
 void handleEnterPointsForGraphInput();
 void highlightCurrentField();
+void drawLoadGraph();
+void handleLoadGraph();
+void graphdraw();
+void graphhandle();
 
 void LCD_task(void *pvParameters);
 
