@@ -16,6 +16,17 @@ const float gyHigh = 1300; // celsius
 uint32_t startTime = 0;
 uint32_t lastTime = 0;
 uint16_t xtime = 0;
+uint16_t totalFireTime = 0;
+
+#define bisque_steps 5
+uint16_t bisque_reachTime[5] = {5, 60, 160, 90, 40};
+uint16_t bisque_targetTemp[5] = {100, 200, 600, 900, 1000};
+uint16_t bisque_holdTime[5] = {60, 10, 10, 15, 10};
+
+#define glaze_steps 6
+uint16_t glaze_reachTime[6] = {5, 90, 160, 120, 80, 24};
+uint16_t glaze_targetTemp[6] = {100, 200, 600, 900, 1050, 1180};
+uint16_t glaze_holdTime[6] = {15, 10, 5, 5, 15, 5};
 
 /*
  * 0 - Startscreen(Load or create new graph)
@@ -162,6 +173,16 @@ void LCD_task(void *pvParameters)
                 vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(60000));
             }
             break;
+
+        case 4: // Load Graphs
+            if (prev_task != 4)
+            {
+                drawLoadGraph();
+                prev_task = 4;
+            }
+            handleLoadGraph();
+            vTaskDelayUntil(&xLastWakeTime, xFrequency);
+            break;
         }
     }
 }
@@ -175,6 +196,7 @@ void drawStartScreen()
     // Clear the screen and display the start screen
     if (prev_task == 3)
     {
+        digitalWrite(RELAY_OUT, LOW);
         vTaskSuspend(Kiln_relay_handle);
     }
     // xSemaphoreTake(display_mutex, portMAX_DELAY);
@@ -701,17 +723,27 @@ void handleLoadGraph()
     {
         switch (current_command)
         {
-        case '1': // Load Graph
+        case '1': // Bisque Graph
             tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Loading bisque graph...")) / 2, (240 - 40));
             tft.println("Loading bisque graph...");
+            number_of_steps = bisque_steps;
+            reachTime = bisque_reachTime;   // Direct assignment, not &bisque_reachTime[0]
+            targetTemp = bisque_targetTemp; // Direct assignment
+            holdTime = bisque_holdTime;     // Direct assignment
+            next_task = 3;
             break;
 
-        case '2': // New Graph
+        case '2': // Glaze Graph
 
             tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Loading glaze graph...")) / 2, (240 - 40));
             tft.println("Loading glaze graph...");
+            number_of_steps = glaze_steps;
+            reachTime = glaze_reachTime;   // Direct assignment
+            targetTemp = glaze_targetTemp; // Direct assignment
+            holdTime = glaze_holdTime;     // Direct assignment
+            next_task = 3;
             break;
 
         case 'B':
@@ -729,6 +761,18 @@ void handleLoadGraph()
 void graphdraw()
 {
     ENDHIGHLIGHT
+
+    // Calculate total fire time
+    totalFireTime = 0;
+    if (number_of_steps > 0)
+    {
+        for (int i = 0; i < number_of_steps; i++)
+        {
+            totalFireTime += reachTime[i] + holdTime[i];
+        }
+        serial_debugging_print("Total fire time: ");
+        serial_debugging_println(totalFireTime);
+    }
     // xSemaphoreTake(display_mutex, portMAX_DELAY);
     tft.fillScreen(TFT_BG);
 
@@ -829,4 +873,8 @@ void graphhandle()
     serial_debugging_print(" : ");
     serial_debugging_println(current_temperature);
     xSemaphoreGive(temp_mutex);
+    if (xtime >= totalFireTime)
+    {
+        next_task = 0;
+    }
 }

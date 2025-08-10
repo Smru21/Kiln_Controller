@@ -101,73 +101,83 @@ float getEMAVoltage()
 
 uint32_t getTargetTemp()
 {
-
-    // Fix: Calculate elapsed time correctly
-    uint32_t currTime = (millis() - startTime) / 60000; // Convert to minutes
-    uint32_t idxTime = 0;
-    uint32_t target = 0;
-    uint8_t idx = 0;
-    bool reachorhold = false;
-
-    // Find which segment we're in
-    for (idx = 0; idx < number_of_steps && idxTime < currTime; idx++)
+    // Add null checks
+    if (reachTime == NULL || targetTemp == NULL || holdTime == NULL || number_of_steps == 0)
     {
-        // First check if we're in a reach phase
+        return 0; // Safe default
+    }
+
+    // Calculate elapsed time correctly
+    uint32_t currTime = (millis() - startTime) / 60000; // Convert to minutes
+    uint32_t accumulatedTime = 0;
+
+    serial_debugging_print("Current time: ");
+    serial_debugging_print(currTime);
+    serial_debugging_print(" minutes, ");
+
+    // Iterate through each step to find which phase we're in
+    for (uint8_t idx = 0; idx < number_of_steps; idx++)
+    {
+        // Phase 1: Reach phase (ramp to target temperature)
         if (reachTime[idx] > 0)
         {
-            idxTime += reachTime[idx];
-            if (idxTime > currTime)
+            uint32_t reachPhaseEnd = accumulatedTime + reachTime[idx];
+
+            if (currTime <= reachPhaseEnd)
             {
-                // We're in this reach phase
-                reachorhold = false;
-                break;
+                // We're in the reach phase for step idx
+                if (idx == 0)
+                {
+                    // First reach phase: NO interpolation, jump directly to target
+                    serial_debugging_print("In first reach phase, target: ");
+                    serial_debugging_println(targetTemp[0]);
+                    return targetTemp[0];
+                }
+                else
+                {
+                    // Subsequent reach phases: DO interpolation from previous temp to current temp
+                    uint32_t timeInReachPhase = currTime - accumulatedTime;
+                    uint32_t startTemp = targetTemp[idx - 1];
+
+                    // Linear interpolation during reach phase
+                    uint32_t target = startTemp + ((targetTemp[idx] - startTemp) * timeInReachPhase) / reachTime[idx];
+
+                    serial_debugging_print("In reach phase ");
+                    serial_debugging_print(idx);
+                    serial_debugging_print(", interpolating from ");
+                    serial_debugging_print(startTemp);
+                    serial_debugging_print(" to ");
+                    serial_debugging_print(targetTemp[idx]);
+                    serial_debugging_print(", target: ");
+                    serial_debugging_println(target);
+
+                    return target;
+                }
             }
+            accumulatedTime = reachPhaseEnd;
         }
 
-        // Check if we're in a hold phase
-        idxTime += holdTime[idx];
-        if (idxTime > currTime)
+        // Phase 2: Hold phase (maintain target temperature)
+        uint32_t holdPhaseEnd = accumulatedTime + holdTime[idx];
+
+        if (currTime <= holdPhaseEnd)
         {
-            // We're in this hold phase
-            reachorhold = true;
-            break;
+            // We're in the hold phase for step idx
+            serial_debugging_print("In hold phase ");
+            serial_debugging_print(idx);
+            serial_debugging_print(", target: ");
+            serial_debugging_println(targetTemp[idx]);
+
+            return targetTemp[idx];
         }
+        accumulatedTime = holdPhaseEnd;
     }
 
-    // Bounds check
-    if (idx >= number_of_steps)
-    {
-        // We've exceeded all steps, return last temperature
-        serial_debugging_println("Exceeded all steps");
-        return targetTemp[number_of_steps - 1];
-    }
+    // If we've gone past all steps, return the final temperature
+    serial_debugging_print("Past all steps, target: ");
+    serial_debugging_println(targetTemp[number_of_steps - 1]);
 
-    if (reachorhold)
-    {
-        // We're in a hold phase, return the target temperature
-        target = targetTemp[idx];
-    }
-    else
-    {
-        // We're in a reach phase, calculate interpolated temperature
-        uint32_t phaseStartTime = idxTime - reachTime[idx];
-        uint32_t timeInPhase = currTime - phaseStartTime;
-
-        if (idx == 0)
-        {
-            // First reach from 0 to targetTemp[0]
-            target = (timeInPhase * targetTemp[idx]) / reachTime[idx];
-        }
-        else
-        {
-            // Reach from previous temp to current temp
-            uint32_t tempDiff = targetTemp[idx] - targetTemp[idx - 1];
-            target = targetTemp[idx - 1] + (timeInPhase * tempDiff) / reachTime[idx];
-        }
-    }
-
-    // serial_debugging_println("GURU DEATH");
-    return target;
+    return targetTemp[number_of_steps - 1];
 }
 
 void Kiln_setup()
