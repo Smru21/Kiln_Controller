@@ -10,12 +10,97 @@ SemaphoreHandle_t temp_mutex = NULL;
 TaskHandle_t Kiln_IR_decode_handle; // Task handle for the IR decoding task
 TaskHandle_t temperatureRead_handle;
 TaskHandle_t Kiln_relay_handle; // Task to handle relay
-uint32_t current_temperature = 0;
-uint32_t analogVal = 0;
+float current_temperature = 0;
+float analogVal = 0;
+
+float voltage = 0;
+float emaVoltage = 0; // EMA filtered voltage
+bool firstReading = true;
+
+static void route_vref_to_gpio()
+{
+    esp_err_t status = adc_vref_to_gpio(ADC_UNIT_1, GPIO_NUM_33);
+    if (status == ESP_OK)
+    {
+        Serial.println("v_ref routed to GPIO\n");
+    }
+    else
+    {
+        Serial.println("failed to route v_ref\n");
+    }
+}
+
+static void check_efuse(void)
+{
+    // Check if TP is burned into eFuse
+    if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP) == ESP_OK)
+    {
+        Serial.println("eFuse Two Point: Supported\n");
+    }
+    else
+    {
+        Serial.println("eFuse Two Point: NOT supported\n");
+    }
+    // Check Vref is burned into eFuse
+    if (esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_VREF) == ESP_OK)
+    {
+        Serial.println("eFuse Vref: Supported\n");
+    }
+    else
+    {
+        Serial.println("eFuse Vref: NOT supported\n");
+    }
+}
+
+static void print_char_val_type(esp_adc_cal_value_t val_type)
+{
+    if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP)
+    {
+        Serial.println("Characterized using Two Point Value\n");
+    }
+    else if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF)
+    {
+        Serial.println("Characterized using eFuse Vref\n");
+    }
+    else
+    {
+        Serial.println("Characterized using Default Vref\n");
+    }
+}
+
+float getEMAVoltage()
+{
+    uint32_t totalVoltage = 0;
+
+    // Take multiple readings and average them
+    for (int i = 0; i < NUM_READINGS; i++)
+    {
+        auto adcReading = adc1_get_raw((adc1_channel_t)channel);
+        if (adcReading > 0)
+        {
+            totalVoltage += esp_adc_cal_raw_to_voltage(adcReading, adcCharacteristics);
+        }
+        vTaskDelay(pdMS_TO_TICKS(5)); // Small delay between readings
+    }
+
+    float currentVoltage = (totalVoltage / NUM_READINGS) / 1000.0;
+
+    // Apply EMA filter
+    if (firstReading)
+    {
+        emaVoltage = currentVoltage;
+        firstReading = false;
+    }
+    else
+    {
+        emaVoltage = (EMA_ALPHA * currentVoltage) + ((1 - EMA_ALPHA) * emaVoltage);
+    }
+
+    return emaVoltage;
+}
 
 uint32_t getTargetTemp()
 {
-    serial_debugging_println("GURU GANDU");
 
     // Fix: Calculate elapsed time correctly
     uint32_t currTime = (millis() - startTime) / 60000; // Convert to minutes
@@ -81,17 +166,35 @@ uint32_t getTargetTemp()
         }
     }
 
-    serial_debugging_println("GURU DEATH");
+    // serial_debugging_println("GURU DEATH");
     return target;
 }
 
 void Kiln_setup()
 {
+    analogReadResolution(12);                     // Set to 12-bit resolution (0-4095)
+    analogSetAttenuation(ADC_11db);               // For 0-3.3V range
     button_queue = xQueueCreate(5, sizeof(char)); // Create a queue for button commands
     ir_mutex = xSemaphoreCreateMutex();
     temp_mutex = xSemaphoreCreateMutex();
-    pinMode(TC_INPUT, INPUT);
+    // pinMode(TC_INPUT, INPUT);
     pinMode(RELAY_OUT, OUTPUT);
+
+    check_efuse();
+
+    // Configure ADC
+    adc1_config_width(width);
+    adc1_config_channel_atten(channel, atten);
+
+    // Characterize ADC
+    adcCharacteristics = (esp_adc_cal_characteristics_t *)calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(unit, atten, width, DEFAULT_VREF, adcCharacteristics);
+    print_char_val_type(val_type);
+
+    Serial.print("vRef: ");
+    Serial.println(adcCharacteristics->vref);
+
+    Serial.println("Ready to measure voltage on GPIO34 with EMA filtering");
 
     xTaskCreatePinnedToCore(
         Kiln_IR_decode,                 // Task function
@@ -155,52 +258,46 @@ void Read_temp_task(void *pvParameters)
 {
     for (;;)
     {
-        analogVal = analogReadMilliVolts(TC_INPUT);
+        // In Read_temp_task():
         xSemaphoreTake(temp_mutex, portMAX_DELAY);
-        if(analogVal < 52)
-        {
-            current_temperature = 37;
-        }
-        else if(analogVal > 4500)
-        {
-            current_temperature = 9999;
-        }
-        else{
-            current_temperature = map(analogVal, 52, 4414, 37, 1230); //in degrees *C
-        }
+        float voltage = getEMAVoltage();
+
+        current_temperature = (309.0 * voltage + 38.8);
 
         xSemaphoreGive(temp_mutex);
   
-        vTaskDelay(5000 * portTICK_PERIOD_MS);
+        vTaskDelay(3000 * portTICK_PERIOD_MS);
     }
 }
 
 void Kiln_relay_task(void *pvParameters)
 {
     for (;;)
-    {
-        // Check if arrays are allocated
-        if (reachTime == NULL || targetTemp == NULL || holdTime == NULL || number_of_steps == 0)
-        {
-            serial_debugging_println("Arrays not initialized, suspending relay task");
-            vTaskSuspend(NULL); // Suspend self
-        }
-
+    { // Add the infinite loop
         uint32_t target_temperature = getTargetTemp();
 
-        xSemaphoreTake(temp_mutex, portMAX_DELAY);
-        if (current_temperature < target_temperature)
+        xSemaphoreTake(temp_mutex, portMAX_DELAY); // Protect temperature read
+        float current_temp_local = current_temperature;
+        xSemaphoreGive(temp_mutex);
+
+        serial_debugging_print("Analog V: ");
+        serial_debugging_print(voltage, 4);
+        serial_debugging_print(" | Current: ");
+        serial_debugging_print(current_temp_local, 1);
+        serial_debugging_print(" | Target: ");
+        serial_debugging_print(target_temperature);
+
+        if (current_temp_local < target_temperature)
         {
             digitalWrite(RELAY_OUT, HIGH);
-            serial_debugging_println("RELAY ON");
+            serial_debugging_println(" | RELAY ON");
         }
         else
         {
             digitalWrite(RELAY_OUT, LOW);
-            serial_debugging_println("RELAY OFF");
+            serial_debugging_println(" | RELAY OFF");
         }
-        xSemaphoreGive(temp_mutex);
 
-        vTaskDelay(5000 * portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Add delay - check every second
     }
 }

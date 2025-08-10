@@ -4,19 +4,18 @@
 
 TFT_eSPI tft = TFT_eSPI();
 
-GraphWidget gr = GraphWidget(&tft); // Graph widget gr instance with pointer to tft
-TraceWidget target_trace = TraceWidget(&gr);  // Graph trace target_trace with pointer to gr
-TraceWidget real_trace = TraceWidget(&gr);  // Graph trace real_trace with pointer to gr, for real time display.
+GraphWidget gr = GraphWidget(&tft);          // Graph widget gr instance with pointer to tft
+TraceWidget target_trace = TraceWidget(&gr); // Graph trace target_trace with pointer to gr
+TraceWidget real_trace = TraceWidget(&gr);   // Graph trace real_trace with pointer to gr, for real time display.
 
 const float gxLow = 0.0;
-const float gxHigh = 900.0; //minutes
+const float gxHigh = 900.0; // minutes
 const float gyLow = 0;
-const float gyHigh = 1300; //celsius
+const float gyHigh = 1300; // celsius
 
 uint32_t startTime = 0;
 uint32_t lastTime = 0;
 uint16_t xtime = 0;
-
 
 /*
  * 0 - Startscreen(Load or create new graph)
@@ -30,13 +29,13 @@ uint16_t xtime = 0;
 volatile uint8_t next_task = 0;
 volatile uint8_t prev_task = 15; // Initialize to an invalid task number
 
-uint8_t number_of_steps = 0;    // Number of steps in the graph
+uint8_t number_of_steps = 0;             // Number of steps in the graph
 volatile uint8_t current_step = 0;       // Current step in the graph creation process
 volatile uint8_t prev_step = 0b11111111; // Which step was drawn last. To prevent redrawing current_step multiple times.
 volatile uint8_t current_digit = 0;      // Keep track of which digit we are working on in any printing function
 volatile uint8_t current_entry = 0;      // Keep track of which of the digits, targetTime, holdTime etc is being filled.
 
-uint8_t graphselect = 0;                 // 0 and 1 are compiled presets
+uint8_t graphselect = 0; // 0 and 1 are compiled presets
 
 // Add these variables at the top of LCD_tasks.cpp with other globals
 uint16_t temp_reachTime = 0;  // Temporary storage for reach time entry
@@ -58,6 +57,7 @@ uint16_t graphPointEntryx = 0;
 uint16_t graphPointEntryy = 0;
 
 TaskHandle_t LCD_task_handle = NULL; // Task handle for all lcd windows. Use a state machine to switch between windows.
+SemaphoreHandle_t display_mutex = NULL;
 
 /*
  * Variable to store the current ir command awaiting processing by current task.
@@ -81,14 +81,18 @@ void LCD_setup()
     // This function should set up the display, initialize any necessary libraries,
     // and prepare the display for use.
 
+    display_mutex = xSemaphoreCreateMutex();
     tft.init();
     tft.setRotation(1);
 
-    tft.fillScreen(TFT_BLACK);
+    pinMode(TFT_BL, OUTPUT);
+    analogWrite(TFT_BL, 125);
 
-    tft.setTextColor(TFT_WHITE, TFT_BLACK); // Adding a background colour erases previous text automatically
+    tft.fillScreen(TFT_BG);
 
-    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_SKBL, TFT_BG); // Adding a background colour erases previous text automatically
+
+    tft.fillScreen(TFT_BG);
     tft.setTextSize(2);
     tft.setCursor(20, 20);
     tft.println("Kiln System");
@@ -113,7 +117,6 @@ void LCD_task(void *pvParameters)
     {
         // Initialise the xLastWakeTime variable with the current time.
         xLastWakeTime = xTaskGetTickCount();
-
         switch (next_task)
         {
         case 0: // Start screen
@@ -151,9 +154,13 @@ void LCD_task(void *pvParameters)
             {
                 graphdraw();
                 prev_task = 3;
+                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(200));
             }
-            graphhandle();
-            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(60000));
+            else
+            {
+                graphhandle();
+                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(60000));
+            }
             break;
         }
     }
@@ -162,28 +169,39 @@ void LCD_task(void *pvParameters)
 // ... draw start screen ...
 void drawStartScreen()
 {
+    ENDHIGHLIGHT
     graphselect = 0;
     emptyQueue<char>(button_queue);
     // Clear the screen and display the start screen
-    if(prev_task == 3)
+    if (prev_task == 3)
     {
         vTaskSuspend(Kiln_relay_handle);
     }
-    tft.fillScreen(TFT_BLACK);
+    // xSemaphoreTake(display_mutex, portMAX_DELAY);
+    tft.fillScreen(TFT_BG);
     tft.setTextSize(2);
     tft.setCursor(0, 20);
-    tft.println(" Kiln Maestro by");
-    tft.println(" by Smrutiranjan Sahoo");
-    tft.println(" and Souryashree Samarpan");
+    tft.println(" Kiln Maestro by - SS");
     tft.println(" ");
     tft.println(" Press a button to start...");
     tft.println(" ");
 
     // Provide options for next window
     // tft.setCursor(tft.textWidth("Kiln System by Smrutiranjan Sahoo") + 20, 20);
-    tft.println(" Load Graph - (1)");
+    tft.print(" Load Graph - (");
+    HIGHLIGHT
+    tft.print("1");
+    ENDHIGHLIGHT
+    tft.println(")");
+
     tft.println(" ");
-    tft.println(" New Graph - (2)");
+
+    tft.print(" New Graph - (");
+    HIGHLIGHT
+    tft.print("2");
+    ENDHIGHLIGHT
+    tft.println(")");
+    // xSemaphoreGive(display_mutex);
 }
 
 //...handle number inputs...
@@ -191,11 +209,13 @@ void handleStartScreenInput()
 {
     if (xQueueReceive(button_queue, &current_command, 10 * portTICK_PERIOD_MS) == pdTRUE)
     {
+
+        // xSemaphoreTake(display_mutex, portMAX_DELAY);
         switch (current_command)
         {
         case '1':          // Load Graph
             next_task = 4; // Set next task to load graph
-            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BLACK);
+            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Loading graph...")) / 2, (240 - 40));
             tft.println("Loading graph...");
             break;
@@ -203,41 +223,48 @@ void handleStartScreenInput()
         case '2':          // New Graph
             next_task = 1; // Set next task to enter number of steps
             graphselect = 2;
-            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BLACK);
+            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Creating new graph...")) / 2, (240 - 40));
             tft.println("Creating new graph...");
             break;
 
         default: // Handle other commands or ignore
-            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BLACK);
+            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Press valid button please...")) / 2, (240 - 40));
             tft.println("Press valid button please...");
             break;
         }
+
+        // xSemaphoreGive(display_mutex);
     }
 }
 
 // Update drawEnterStepsScreen to use temp_steps
 void drawEnterStepsScreen()
 {
+    ENDHIGHLIGHT
+    // xSemaphoreTake(display_mutex, portMAX_DELAY);
     current_digit = 0;
     number_of_steps = 0;
     temp_steps = 0; // Reset temporary value
     emptyQueue<char>(button_queue);
-    tft.fillScreen(TFT_BLACK);
+    tft.fillScreen(TFT_BG);
     tft.setTextSize(2);
     tft.setCursor((320 - tft.textWidth("Enter no of steps -    ")) / 2, 120);
     tft.print("Enter no of steps - ");
     stepscreenx = tft.getCursorX();
     stepscreeny = tft.getCursorY();
     tft.print("_"); // Show cursor
+    // xSemaphoreGive(display_mutex);
 }
 
 // Update handleEnterStepsInput to use temp_steps
 void handleEnterStepsInput()
 {
+    HIGHLIGHT
     if (xQueueReceive(button_queue, &current_command, 50 * portTICK_PERIOD_MS))
     {
+        // xSemaphoreTake(display_mutex, portMAX_DELAY);
         if (current_command == 'B')
         {
             // Remove last digit
@@ -245,7 +272,7 @@ void handleEnterStepsInput()
             current_digit = (current_digit > 0) ? current_digit - 1 : 0;
 
             // Update display
-            tft.fillRect(stepscreenx, stepscreeny, 100, tft.fontHeight(), TFT_BLACK);
+            tft.fillRect(stepscreenx, stepscreeny, 100, tft.fontHeight(), TFT_BG);
             tft.setCursor(stepscreenx, stepscreeny);
             if (temp_steps > 0)
             {
@@ -264,7 +291,7 @@ void handleEnterStepsInput()
             current_digit++;
 
             // Update display
-            tft.fillRect(stepscreenx, stepscreeny, 100, tft.fontHeight(), TFT_BLACK);
+            tft.fillRect(stepscreenx, stepscreeny, 100, tft.fontHeight(), TFT_BG);
             tft.setCursor(stepscreenx, stepscreeny);
             tft.print(temp_steps);
         }
@@ -272,7 +299,7 @@ void handleEnterStepsInput()
         {
             temp_steps = 0; // Clear temporary value
             next_task = 0;
-            tft.fillRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BLACK);
+            tft.fillRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Going back...")) / 2, (240 - 40));
             tft.println("Going back...");
             vTaskDelay(pdMS_TO_TICKS(500));
@@ -301,7 +328,7 @@ void handleEnterStepsInput()
                     targetTemp = NULL;
                     holdTime = NULL;
 
-                    tft.fillRect(0, (240 - 40), tft.width(), 40, TFT_BLACK);
+                    tft.fillRect(0, (240 - 40), tft.width(), 40, TFT_BG);
                     tft.setCursor((320 - tft.textWidth("Memory Error!")) / 2, (240 - 40));
                     tft.print("Memory Error!");
                     vTaskDelay(pdMS_TO_TICKS(2000));
@@ -316,7 +343,7 @@ void handleEnterStepsInput()
 
                     temp_steps = 0; // Clear temporary value
                     next_task = 2;
-                    tft.fillRect(0, (240 - 40), tft.width(), 40, TFT_BLACK);
+                    tft.fillRect(0, (240 - 40), tft.width(), 40, TFT_BG);
                     tft.setCursor((320 - tft.textWidth("Initializing new graph...")) / 2, (240 - 40));
                     tft.println("Initializing new graph...");
                     vTaskDelay(pdMS_TO_TICKS(500));
@@ -325,17 +352,20 @@ void handleEnterStepsInput()
             else
             {
                 // Invalid number of steps
-                tft.fillRect(0, (240 - 40), tft.width(), 40, TFT_BLACK);
+                tft.fillRect(0, (240 - 40), tft.width(), 40, TFT_BG);
                 tft.setCursor((320 - tft.textWidth("Enter integer steps!")) / 2, (240 - 40));
                 tft.print("Enter integer steps!");
             }
         }
+        // xSemaphoreGive(display_mutex);
     }
 }
 
 // Update drawEnterPointsForGraph to reset temp variables
 void drawEnterPointsForGraph()
 {
+    // xSemaphoreTake(display_mutex, portMAX_DELAY);
+    ENDHIGHLIGHT
     prev_step = 0;
     current_step = 0;
     current_entry = 0;
@@ -346,7 +376,7 @@ void drawEnterPointsForGraph()
     temp_holdTime = 0;
 
     emptyQueue<char>(button_queue);
-    tft.fillScreen(TFT_BLACK);
+    tft.fillScreen(TFT_BG);
     tft.setTextSize(2);
 
     // Display step number (1-based for display)
@@ -354,14 +384,18 @@ void drawEnterPointsForGraph()
     tft.print("Step no - ");
     graphentryX = tft.getCursorX();
     graphentryY = tft.getCursorY();
+    HIGHLIGHT
     tft.print(current_step + 1);
+    ENDHIGHLIGHT
 
     // Display all three fields with correct labels
     tft.setCursor((320 - tft.textWidth("Enter reach time -     ")) / 2, 100);
     tft.print("Enter reach time - ");
     graphPointEntryx = tft.getCursorX();
     graphPointEntryy = tft.getCursorY();
+    HIGHLIGHT
     tft.print("_");
+    ENDHIGHLIGHT
 
     tft.setCursor((320 - tft.textWidth("Enter target temp -    ")) / 2, 120);
     tft.print("Enter target temp - ");
@@ -372,11 +406,15 @@ void drawEnterPointsForGraph()
     // Instructions
     tft.setTextSize(1);
     tft.setCursor(10, 200);
+    HIGHLIGHT
     tft.print("UP/DOWN: Navigate | OK: Next | BACK: Previous");
+    ENDHIGHLIGHT
     tft.setTextSize(2);
 
     current_digit = 0;
     highlightCurrentField();
+
+    // xSemaphoreGive(display_mutex);
 }
 
 // Helper function to get current temp value reference
@@ -398,22 +436,24 @@ uint16_t *getCurrentTempValue()
 void highlightCurrentField()
 {
     // Clear all field indicators
-    tft.fillRect(5, 100, 5, 16, TFT_BLACK);
-    tft.fillRect(5, 120, 5, 16, TFT_BLACK);
-    tft.fillRect(5, 140, 5, 16, TFT_BLACK);
+    tft.fillRect(5, 100, 5, 16, TFT_BG);
+    tft.fillRect(5, 120, 5, 16, TFT_BG);
+    tft.fillRect(5, 140, 5, 16, TFT_BG);
 
     // Draw indicator for current field
     int y = 100 + (current_entry * 20);
-    tft.fillRect(5, y, 5, 16, TFT_WHITE);
+    tft.fillRect(5, y, 5, 16, TFT_WATER);
 }
 
 void handleEnterPointsForGraphInput()
 {
+    // xSemaphoreTake(display_mutex, portMAX_DELAY);
+    HIGHLIGHT
     // Update step number if changed
     if (prev_step != current_step)
     {
         prev_step = current_step;
-        tft.fillRect(graphentryX, graphentryY, 60, tft.fontHeight(), TFT_BLACK);
+        tft.fillRect(graphentryX, graphentryY, 60, tft.fontHeight(), TFT_BG);
         tft.setCursor(graphentryX, graphentryY);
         tft.print(current_step + 1);
 
@@ -423,9 +463,9 @@ void handleEnterPointsForGraphInput()
         temp_holdTime = holdTime[current_step];
 
         // Clear all value fields when changing steps
-        tft.fillRect(graphPointEntryx, graphPointEntryy, 60, tft.fontHeight(), TFT_BLACK);
-        tft.fillRect(graphPointEntryx, graphPointEntryy + 20, 60, tft.fontHeight(), TFT_BLACK);
-        tft.fillRect(graphPointEntryx, graphPointEntryy + 40, 60, tft.fontHeight(), TFT_BLACK);
+        tft.fillRect(graphPointEntryx, graphPointEntryy, 60, tft.fontHeight(), TFT_BG);
+        tft.fillRect(graphPointEntryx, graphPointEntryy + 20, 60, tft.fontHeight(), TFT_BG);
+        tft.fillRect(graphPointEntryx, graphPointEntryy + 40, 60, tft.fontHeight(), TFT_BG);
 
         // Display existing values
         tft.setCursor(graphPointEntryx, graphPointEntryy);
@@ -512,12 +552,16 @@ void handleEnterPointsForGraphInput()
                 current_digit = (current_digit > 0) ? current_digit - 1 : 0;
 
                 // Update display
-                tft.fillRect(graphPointEntryx, graphPointEntryy + yOffset, 60, tft.fontHeight(), TFT_BLACK);
+                tft.fillRect(graphPointEntryx, graphPointEntryy + yOffset, 60, tft.fontHeight(), TFT_BG);
                 tft.setCursor(graphPointEntryx, graphPointEntryy + yOffset);
+
+                HIGHLIGHT
                 if (*currentTempValue > 0)
                     tft.print(*currentTempValue);
                 else
                     tft.print("_");
+
+                ENDHIGHLIGHT
             }
         }
         else if (current_command >= '0' && current_command <= '9' && current_digit < 4)
@@ -528,7 +572,7 @@ void handleEnterPointsForGraphInput()
             current_digit++;
 
             // Update display
-            tft.fillRect(graphPointEntryx, graphPointEntryy + yOffset, 60, tft.fontHeight(), TFT_BLACK);
+            tft.fillRect(graphPointEntryx, graphPointEntryy + yOffset, 60, tft.fontHeight(), TFT_BG);
             tft.setCursor(graphPointEntryx, graphPointEntryy + yOffset);
             tft.print(*currentTempValue);
         }
@@ -548,7 +592,7 @@ void handleEnterPointsForGraphInput()
 
                 // Update display
                 int newYOffset = current_entry * 20;
-                tft.fillRect(graphPointEntryx, graphPointEntryy + newYOffset, 60, tft.fontHeight(), TFT_BLACK);
+                tft.fillRect(graphPointEntryx, graphPointEntryy + newYOffset, 60, tft.fontHeight(), TFT_BG);
                 tft.setCursor(graphPointEntryx, graphPointEntryy + newYOffset);
                 if (*currentTempValue > 0)
                     tft.print(*currentTempValue);
@@ -572,7 +616,7 @@ void handleEnterPointsForGraphInput()
 
                 // Update display
                 int newYOffset = current_entry * 20;
-                tft.fillRect(graphPointEntryx, graphPointEntryy + newYOffset, 60, tft.fontHeight(), TFT_BLACK);
+                tft.fillRect(graphPointEntryx, graphPointEntryy + newYOffset, 60, tft.fontHeight(), TFT_BG);
                 tft.setCursor(graphPointEntryx, graphPointEntryy + newYOffset);
                 if (*currentTempValue > 0)
                     tft.print(*currentTempValue);
@@ -597,7 +641,7 @@ void handleEnterPointsForGraphInput()
 
                 // Update display
                 int newYOffset = current_entry * 20;
-                tft.fillRect(graphPointEntryx, graphPointEntryy + newYOffset, 60, tft.fontHeight(), TFT_BLACK);
+                tft.fillRect(graphPointEntryx, graphPointEntryy + newYOffset, 60, tft.fontHeight(), TFT_BG);
                 tft.setCursor(graphPointEntryx, graphPointEntryy + newYOffset);
                 if (*currentTempValue > 0)
                     tft.print(*currentTempValue);
@@ -614,30 +658,32 @@ void handleEnterPointsForGraphInput()
                 temp_targetTemp = 0;
                 temp_holdTime = 0;
                 // prev_step will be updated on next iteration
+                highlightCurrentField();
             }
             else
             {
                 // All steps completed
                 next_task = 3;
-                tft.fillRect(0, 220, 320, 20, TFT_BLACK);
+                tft.fillRect(0, 220, 320, 20, TFT_BG);
                 tft.setCursor((320 - tft.textWidth("All steps entered!")) / 2, 220);
                 tft.print("All steps entered!");
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }
         }
     }
+    // xSemaphoreGive(display_mutex);
 }
 
 void drawLoadGraph()
 {
     emptyQueue<char>(button_queue);
     // Clear the screen and display the start screen
-    tft.fillScreen(TFT_BLACK);
+
+    xSemaphoreTake(display_mutex, portMAX_DELAY);
+    tft.fillScreen(TFT_BG);
     tft.setTextSize(2);
     tft.setCursor(0, 20);
     tft.println(" Load preset graphs");
-    tft.println(" ");
-    tft.println(" ");
     tft.println(" ");
 
     // Provide options for next window
@@ -645,6 +691,8 @@ void drawLoadGraph()
     tft.println(" Bisque - (1)");
     tft.println(" ");
     tft.println(" Glaze firing - (2)");
+
+    xSemaphoreGive(display_mutex);
 }
 
 void handleLoadGraph()
@@ -653,24 +701,24 @@ void handleLoadGraph()
     {
         switch (current_command)
         {
-        case '1':          // Load Graph
-            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BLACK);
+        case '1': // Load Graph
+            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Loading bisque graph...")) / 2, (240 - 40));
             tft.println("Loading bisque graph...");
             break;
 
-        case '2':          // New Graph
+        case '2': // New Graph
 
-            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BLACK);
+            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Loading glaze graph...")) / 2, (240 - 40));
             tft.println("Loading glaze graph...");
             break;
 
-        case 'B' :
+        case 'B':
             next_task = 0;
 
         default: // Handle other commands or ignore
-            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BLACK);
+            tft.drawRect(0, (240 - 40), tft.width(), tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Press valid button please...")) / 2, (240 - 40));
             tft.println("Press valid button please...");
             break;
@@ -680,10 +728,12 @@ void handleLoadGraph()
 
 void graphdraw()
 {
-    tft.fillScreen(TFT_BLACK);
+    ENDHIGHLIGHT
+    // xSemaphoreTake(display_mutex, portMAX_DELAY);
+    tft.fillScreen(TFT_BG);
 
     // Graph area is 280 pixels wide, 180 pixels high, dark grey background
-    gr.createGraph(280, 180, tft.color565(5, 5, 5));
+    gr.createGraph(280, 180, TFT_BG);
 
     // x scale units is from 0 to 100, y scale units is -512 to 512
     gr.setGraphScale(gxLow, gxHigh, gyLow, gyHigh);
@@ -691,14 +741,15 @@ void graphdraw()
     // X grid starts at 0 with lines every 60 mins
     // Y grid starts at 0 with lines every 64 y-scale units
     // blue grid
-    gr.setGraphGrid(gxLow, 60.0, gyLow, 100.0, TFT_BLUE);
+    gr.setGraphGrid(gxLow, 60.0, gyLow, 100.0, TFT_MIDNGREEN);
 
     // Draw empty graph, top left corner at pixel coordinate 40,10 on TFT
-    gr.drawGraph(40, 10);
+    gr.drawGraph(20, 10);
 
     // Draw the x axis scale
     tft.setTextSize(1);
     tft.setTextDatum(TC_DATUM); // Top centre text datum
+    HIGHLIGHT
     tft.drawNumber(0, gr.getPointX(0.0), gr.getPointY(0.0) + 3);
     tft.drawNumber(3, gr.getPointX(180.0), gr.getPointY(0.0) + 3);
     tft.drawNumber(6, gr.getPointX(360.0), gr.getPointY(0.0) + 3);
@@ -717,7 +768,7 @@ void graphdraw()
 
     temp_reachTime = 0;
 
-    target_trace.startTrace(TFT_RED);
+    target_trace.startTrace(TFT_SKBL);
 
     if (number_of_steps > 0)
     {
@@ -737,40 +788,45 @@ void graphdraw()
         tft.print("OK : Run | < : Home");
     }
 
+    // xSemaphoreGive(display_mutex);
     emptyQueue<char>(button_queue);
 
     if (xQueueReceive(button_queue, &current_command, portMAX_DELAY))
     {
+        // xSemaphoreTake(display_mutex, portMAX_DELAY);
         if (current_command == 'O')
         {
             next_task = 3;
             tft.setTextSize(1);
-            tft.fillRect(0, 190, 320, tft.fontHeight(), TFT_BLACK);
+            tft.fillRect(0, 220, 320, tft.fontHeight(), TFT_BG);
             tft.setCursor((320 - tft.textWidth("Running...")) / 2, 220);
             tft.print("Running...");
-            real_trace.startTrace(TFT_GREEN);
+            real_trace.startTrace(TFT_GREENYELLOW);
             startTime = millis(); // Set start of firing time for reference
             lastTime = startTime;
 
             vTaskResume(Kiln_relay_handle);
         }
-        else if (current_command = 'B')
+        else if (current_command == 'B')
         {
             next_task = 0;
         }
 
         xtime = 0;
         serial_debugging_println(next_task);
+        // xSemaphoreGive(display_mutex);
     }
+    ENDHIGHLIGHT
 }
 
-void graphhandle(){
+void graphhandle()
+{
 
+    xSemaphoreTake(temp_mutex, portMAX_DELAY);
     real_trace.addPoint(xtime, current_temperature);
     xtime++;
     serial_debugging_print(xtime);
     serial_debugging_print(" : ");
     serial_debugging_println(current_temperature);
-    
+    xSemaphoreGive(temp_mutex);
 }
-

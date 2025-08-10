@@ -18,12 +18,34 @@
 #include <freertos/semphr.h>
 #include "remote_buttons.h" // Include remote button definitions
 #include "Serial_debugging.h" // Include serial debugging functions
+#include "driver/gpio.h"
+#include "driver/adc.h"
+#include "esp_adc_cal.h"
 
 #define TC_INPUT 34
 #define RELAY_OUT 32
 
-extern uint32_t current_temperature;
-extern uint32_t analogVal;
+#define DEFAULT_VREF 1100 // Use adc2_vref_to_gpio() to obtain a better estimate
+#define NUM_READINGS 6   // Number of readings to take
+#define EMA_ALPHA 0.5f    // EMA smoothing factor (0-1, lower = more smoothing)
+
+#ifndef CONFIG_IDF_TARGET_ESP32
+#error "This example is configured for ESP32."
+#endif
+
+static esp_adc_cal_characteristics_t *adcCharacteristics;
+static const adc1_channel_t channel = ADC1_CHANNEL_6; // GPIO34 if ADC1
+static const adc_bits_width_t width = ADC_WIDTH_BIT_9;
+
+static const adc_atten_t atten = ADC_ATTEN_DB_12; // 11dB attenuation for 0-3.3V range
+static const adc_unit_t unit = ADC_UNIT_1;
+
+extern float voltage;
+extern float emaVoltage; // EMA filtered voltage
+extern bool firstReading;
+
+extern float current_temperature;
+extern float analogVal;
 extern uint32_t startTime;
 extern uint32_t lastTime;
 extern uint16_t xtime;
@@ -56,9 +78,14 @@ void Kiln_setup();
 
 uint32_t getTargetTemp();
 
+static void check_efuse(void);
+
+static void print_char_val_type(esp_adc_cal_value_t val_type);
+
+float getEMAVoltage();
 // FreeRTOS kiln central tasks
 // This task decodes IR signals and sends button presses to the button queue
-void Kiln_IR_decode(void* pvParameters);
+void Kiln_IR_decode(void *pvParameters);
 
 void Read_temp_task(void *pvParameters);
 

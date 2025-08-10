@@ -6,12 +6,14 @@
 #include <TFT_eSPI.h> // Include the TFT library for LCD tasks
 #include <TFT_eWidget.h> // For graphing
 
-#define TASK0 LCD_startscreen_handle
-#define TASK1 LCD_startscreen_handle
-#define TASK2 LCD_startscreen_handle
-#define TASK3 LCD_startscreen_handle
-#define TASK4 LCD_startscreen_handle
-#define TASK5 LCD_startscreen_handle
+#define TFT_BG 0x2945
+#define TFT_MIDNGREEN 0x6884
+#define TFT_LIGHTSEAGREEN 0xa2a1
+#define TFT_SKBL 0xe311
+#define TFT_WATER 0xf5c7
+
+#define HIGHLIGHT           tft.setTextColor(TFT_WATER, TFT_BG);
+#define ENDHIGHLIGHT        tft.setTextColor(TFT_SKBL, TFT_BG);
 
 extern TFT_eSPI tft; // Invoke custom library
 
