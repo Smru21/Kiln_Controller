@@ -1,6 +1,13 @@
 #ifndef KILN_TASKS_H
 #define KILN_TASKS_H
-
+// Temporary — remove after hardware fix
+#define TEMP_EXTRAPOLATION_HACK
+// ─── SIMULATION MODE ──────────────────────────────────────
+// Uncomment to test without thermocouple
+// ⚠️ COMMENT THIS OUT BEFORE REAL FIRING
+//#define SIM_MODE
+//#define SIM_SPEED 60    // 60x faster: 1 real second = 1 simulated minute
+// ───────────────────────────────────────────────────────────
 /*
  * Kiln_tasks.h
  *
@@ -90,5 +97,7 @@ void Kiln_IR_decode(void *pvParameters);
 void Read_temp_task(void *pvParameters);
 
 void Kiln_relay_task(void *pvParameters);
+
+uint32_t getElapsedMinutes();
 
 #endif // KILN_TASKS_H
