@@ -1,3 +1,4 @@
+<img width="780" height="1040" alt="11" src="https://github.com/user-attachments/assets/a5b19a0d-0ee1-4275-83cd-c3cc8e8ff2a6" />
 # 🏺 Kiln Maestro: ESP32-Based Professional Kiln Controller
 
 A feature-rich, child-friendly kiln controller built on the ESP32 using FreeRTOS. This system manages high-temperature firing profiles (Bisque, Glaze, Custom) with real-time graph visualization.
